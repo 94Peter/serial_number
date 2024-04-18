@@ -1,0 +1,31 @@
+syntax = "proto3";  // 定義要使用的 protocol buffer 版本
+
+option go_package = "grpc/pb";
+package serial_number;
+
+import "google/protobuf/empty.proto";
+
+message CreatePrefixRequest {
+  string prefix = 1;
+  int64 start_number = 2;
+}
+
+message GetSerialNumberRequest {
+  string prefix = 1;
+}
+
+message SerialNumberRespose {
+  string prefix = 1;
+  int64 serial_number = 2;
+}
+
+service GcpService {
+  // 建立前綴
+  rpc CreatePrefix(CreatePrefixRequest) returns (google.protobuf.Empty) {};
+  // 更新序號
+  rpc UpdateStartNumber(CreatePrefixRequest) returns (google.protobuf.Empty) {};
+  // 取得序號
+  rpc GetSerialNumber(GetSerialNumberRequest) returns (SerialNumberRespose) {};
+  // 清除前綴
+  rpc ClearPrefix(GetSerialNumberRequest) returns (google.protobuf.Empty) {};
+}
