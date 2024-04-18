@@ -8,11 +8,19 @@ import (
 	"time"
 
 	"github.com/94peter/log"
+	"github.com/94peter/microservice/cfg"
+	"github.com/94peter/microservice/di"
 )
+
+type ModelDI interface {
+	di.DI
+	log.LoggerDI
+}
 
 type Config struct {
 	PersistanceFile string `env:"PERSISTANCE_FILE"`
 
+	di        ModelDI
 	Log       log.Logger
 	serialMgr SerialMgr
 }
@@ -26,10 +34,30 @@ func GetModelCfgFromEnv() (*Config, error) {
 	return config, nil
 }
 
-func (c *Config) Close() {
+func (c *Config) Close() error {
 	if c.serialMgr != nil {
 		c.serialMgr.Persistance()
 	}
+	return nil
+}
+
+func (c *Config) Copy() cfg.ModelCfg {
+	mycfg := *c
+	return &mycfg
+}
+
+func (c *Config) Init(uuid string, di di.DI) error {
+	c.di = di.(ModelDI)
+	var err error
+	c.Log, err = c.newLog(uuid)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Config) newLog(uuid string) (log.Logger, error) {
+	return c.di.NewLogger(c.di.GetService(), uuid)
 }
 
 func (c *Config) NewSerial() SerialMgr {

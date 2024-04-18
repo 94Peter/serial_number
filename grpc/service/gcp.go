@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
-	"serial_number/model"
 
-	"serial_number/grpc/pb"
+	"github.com/94peter/serial_number/model"
+
+	"github.com/94peter/serial_number/grpc/pb"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

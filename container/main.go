@@ -5,17 +5,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"serial_number/grpc/pb"
-	"serial_number/grpc/service"
-	"serial_number/model"
-	"sync"
-	"syscall"
 	"time"
 
-	"github.com/94peter/di"
-	"github.com/94peter/grpc-tool/autorun"
 	"github.com/94peter/log"
+	"github.com/94peter/microservice"
+	"github.com/94peter/microservice/di"
+	"github.com/94peter/microservice/grpc_tool"
+	"github.com/94peter/serial_number/grpc/pb"
+	"github.com/94peter/serial_number/grpc/service"
+	"github.com/94peter/serial_number/model"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -49,58 +47,21 @@ func main() {
 		}
 	}
 
-	mainDI := &mydi{}
-	diCfg, err := di.GetConfigFromEnv()
-	if err != nil {
-		panic(err)
-	}
-	err = di.InitServiceDIByCfg(diCfg, mainDI)
-	if err != nil {
-		panic(err)
-	}
-	if err = mainDI.IsConfEmpty(); err != nil {
-		panic(err)
-	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
-	signal.Notify(sig, syscall.SIGTERM)
-
-	log, err := mainDI.NewLogger(mainDI.GetService(), "main")
-	if err != nil {
-		panic(err)
-	}
 	modelCfg, err := model.GetModelCfgFromEnv()
 	if err != nil {
 		panic(err)
 	}
-	modelCfg.Log = log
-	defer modelCfg.Close()
 
-	grpcCfg, err := autorun.GetConfigFromEnv()
+	ms, err := microservice.New(modelCfg, &mydi{})
 	if err != nil {
 		panic(err)
 	}
-	grpcCfg.Logger = log
 
-	grpcCfg.SetRegisterServiceFunc(func(grpcServer *grpc.Server) {
-		pb.RegisterGcpServiceServer(grpcServer, service.NewGcp(modelCfg))
-	})
+	serv := newService(ms)
+	microservice.RunService(
+		serv.StartGrpc,
+	)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	grpcCtx, grpcCancel := context.WithCancel(context.Background())
-	go func(ctx context.Context, grpcfg *autorun.GrpcConfig) {
-		defer wg.Done()
-		autorun.RunGrpcServ(ctx, grpcfg)
-	}(grpcCtx, grpcCfg)
-
-	<-sig
-	if grpcCancel != nil {
-		grpcCancel()
-	}
-	wg.Wait()
 	fmt.Println("Bye")
 }
 
@@ -115,4 +76,33 @@ func (d *mydi) IsConfEmpty() error {
 		return errors.New("log.FluentLog no set")
 	}
 	return nil
+}
+
+type mService struct {
+	microservice.MicroService[*model.Config, *mydi]
+}
+
+func newService(ms microservice.MicroService[*model.Config, *mydi]) *mService {
+	return &mService{MicroService: ms}
+}
+
+func (s *mService) StartGrpc(ctx context.Context) {
+	cfg, err := s.NewCfg("grpc")
+	if err != nil {
+		panic(err)
+	}
+	defer cfg.Close()
+	grpcCfg, err := grpc_tool.GetConfigFromEnv()
+	if err != nil {
+		panic(err)
+	}
+	grpcCfg.Logger = cfg.Log
+	grpcCfg.SetRegisterServiceFunc(func(grpcServ *grpc.Server) {
+		pb.RegisterGcpServiceServer(grpcServ, service.NewGcp(cfg))
+	})
+
+	err = grpc_tool.RunGrpcServ(ctx, grpcCfg)
+	if err != nil {
+		panic(fmt.Sprintf("grpc run fail: %v", err))
+	}
 }

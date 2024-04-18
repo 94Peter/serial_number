@@ -2,8 +2,9 @@ package model_test
 
 import (
 	"fmt"
-	"serial_number/model"
 	"testing"
+
+	"github.com/94peter/serial_number/model"
 )
 
 func TestGetSerial(t *testing.T) {
