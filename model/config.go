@@ -31,6 +31,7 @@ func GetModelCfgFromEnv() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	config.serialMgr = NewSerial(config)
 	return config, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"time"
 )
 
 var (
@@ -23,6 +24,8 @@ type SerialMgr interface {
 type serial struct {
 	serialMap   map[string]int64
 	persistFile string
+	persistTime time.Time
+	modifyTime  time.Time
 	sync.Mutex
 }
 
@@ -42,6 +45,9 @@ func NewSerial(cfg *Config) SerialMgr {
 		dec := gob.NewDecoder(f)
 		dec.Decode(&mgr.serialMap)
 	}
+	now := time.Now()
+	mgr.persistTime = now
+	mgr.modifyTime = now
 	return mgr
 }
 
@@ -51,6 +57,7 @@ func (s *serial) CreateSerial(prefix string, startNumber int64) error {
 	}
 	s.Lock()
 	s.serialMap[prefix] = startNumber
+	s.modifyTime = time.Now()
 	s.Unlock()
 	return nil
 }
@@ -61,6 +68,7 @@ func (s *serial) UpdateSerial(prefix string, startNumber int64) error {
 	}
 	s.Lock()
 	s.serialMap[prefix] = startNumber
+	s.modifyTime = time.Now()
 	s.Unlock()
 	return nil
 }
@@ -73,6 +81,7 @@ func (s *serial) GetSerial(prefix string) (int64, error) {
 	defer s.Unlock()
 	result := s.serialMap[prefix] + 1
 	s.serialMap[prefix] = result
+	s.modifyTime = time.Now()
 	return result, nil
 }
 
@@ -82,11 +91,15 @@ func (s *serial) ClearSerial(prefix string) error {
 	}
 	s.Lock()
 	delete(s.serialMap, prefix)
+	s.modifyTime = time.Now()
 	s.Unlock()
 	return nil
 }
 
 func (s *serial) Persistance() error {
+	if s.persistTime.After(s.modifyTime) {
+		return nil
+	}
 	// save map to file
 	f, err := os.Create(s.persistFile)
 	if err != nil {
@@ -101,5 +114,6 @@ func (s *serial) Persistance() error {
 	if err := enc.Encode(s.serialMap); err != nil {
 		return err
 	}
+	s.persistTime = time.Now()
 	return nil
 }

@@ -1,0 +1,14 @@
+services:
+  serial-svc:
+    image: 94peter/serial_number:0.0.2
+    environment:
+    - SERVICE=serial_number
+    - PERSISTANCE_FILE=/etc/serial.pers
+    - CONFIG_FILE=/etc/config.yml
+    - GRPC_PORT=7080
+    - GRPC_REFLECT=true
+    volumes:
+    - ./conf/config.yml:/etc/config.yml
+    - ./test.per:/etc/serial.pers
+    ports:
+    - 17080:7080

@@ -60,6 +60,7 @@ func main() {
 	serv := newService(ms)
 	microservice.RunService(
 		serv.StartGrpc,
+		serv.Persistance,
 	)
 
 	fmt.Println("Bye")
@@ -104,5 +105,22 @@ func (s *mService) StartGrpc(ctx context.Context) {
 	err = grpc_tool.RunGrpcServ(ctx, grpcCfg)
 	if err != nil {
 		panic(fmt.Sprintf("grpc run fail: %v", err))
+	}
+}
+
+func (s *mService) Persistance(ctx context.Context) {
+	cfg, err := s.NewCfg("bg")
+	if err != nil {
+		panic(err)
+	}
+	mgr := cfg.NewSerial()
+	ticker := time.NewTicker(time.Second * 5)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			mgr.Persistance()
+		}
 	}
 }
